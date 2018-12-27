@@ -14,8 +14,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 # global articles_df
-global dfff
-
+global dfff,temp_df
 
 
 def aggregate_fun(df,agg):
@@ -27,8 +26,7 @@ def aggregate_fun(df,agg):
 
 
 
-
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css','https://codepen.io/chriddyp/pen/brPBPO.css']
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css','https://codepen.io/chriddyp/pen/brPBPO.css','https://raw.githubusercontent.com/varunsingh1996/pubninja-analytics/master/dashboard_style.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 dfff = pd.DataFrame()
 
@@ -37,57 +35,70 @@ app.layout = html.Div([
     #Data Hidden Div
     html.Div(id='data_frame',style = {'display': 'none'}),
     #Header
-    html.Div(
-        [
-            html.H4(children = 'Analytics Dashboard', className = 'nine columns', style={'float':'left'}),
-            html.Img(src='https://pubninja.com/assets/images/logo.png',className='three columns',style={'height':'15%','width':'15%','float':'right','position':'relative','background-color':'black','margin':'10px'})
-        ],className = 'row'),
-    # Date Select
     html.Div([
-        html.Div(
-            [
-                html.Label('Select Date Range'),
-                dcc.DatePickerSingle(
-                    id='date_start',
-                    date=dt(2018, 11, 01)),
-                    # style= {'float':'right'}),
-                dcc.DatePickerSingle(
-                    id='date_end',
-                    date=dt(2018, 12, 11)
-                    # style= {'float':'right'}
-                    )
-            ],className='nine columns',style={'float':'left'}),
-        html.Div(
-            [
-                html.Label('**Exclude Meaww'),
-                dcc.RadioItems(
-                    id='meaww_filter',
-                    options=[
-                        {'label': 'Yes', 'value': 'meaww'},
-                        {'label': 'No', 'value': ''}
-                    ],
-                    value='',
-                    labelStyle={'display': 'inline-block'}
-                    )
-            ],className='three columns',style={'float':'right','width': '12%'})
-    ],className='row'),
+            html.Div(
+                [
+                    html.H4(children = 'Analytics Dashboard', className = 'nine columns', style={'float':'left'}),
+                    html.Img(src='https://pubninja.com/assets/images/logo.png',className='three columns',style={'height':'15%','width':'15%','float':'right','position':'relative','background-color':'black','margin':'10px'})
+                ],className = 'row'),
+            # Date Select
+            html.Div([
+                html.Div(
+                    [
+                        html.Label('**Exclude Meaww'),
+                        dcc.RadioItems(
+                            id='meaww_filter',
+                            options=[
+                                {'label': 'Yes', 'value': 'meaww'},
+                                {'label': 'No', 'value': ''}
+                            ],
+                            value='',
+                            labelStyle={'display': 'inline-block'}
+                            )
+                    ],className='three columns',style={'float':'left'}),
+                html.Div(
+                    [
+                        html.Label('Select Date Range'),
+                        dcc.DatePickerSingle(
+                            id='date_start',
+                            date=dt(2018, 11, 01)),
+                            # style= {'float':'right'}),
+                        dcc.DatePickerSingle(
+                            id='date_end',
+                            date=dt(2018, 12, 11)
+                            # style= {'float':'right'}
+                            )
+                    ],className='four columns',style={'float':'right','width': '23.666667%'})
+            ],className = 'row')
+        ],className = 'top-nav', style = {'position': 'fixed','top': '0','height': 'inherit', 'width': '100%', 'background-color': 'green','overflow':'hidden','zIndex': 9999999999}),
 
+    #Filter List
+    html.Div([
+        html.Hr(),html.Label('Domain Selected'),dcc.Dropdown(id='filter_domain', multi=True),
+        html.Label('Category Selected'),dcc.Dropdown(id='filter_category', multi=True),
+        html.Label('Geolocation Selected'),dcc.Dropdown(id='filter_geo', multi=True),
+        html.Label('Traffic Source Selected'),dcc.Dropdown(id='filter_source', multi=True),
+        html.Br(),
+        html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data'),
+        #Filter Hidden Data
+        html.Div(id='filters',style = {'display': 'none'})
+        ],className = 'side-nav', style = {'padding': '0 5px','position': 'fixed', 'width': ' 250px','height':'100vh','left': '8px','right': '0px','overflow-y': 'scroll','background-color': 'red', 'top': '132px'}),
 
-    #Domain List
-    html.Div([html.Label('Domain Selected',className = 'two columns'),dcc.Dropdown(id='filter_domain', multi=True,className = 'ten columns')],className='row'),
-    html.Div([html.Label('Category Selected',className = 'two columns'),dcc.Dropdown(id='filter_category', multi=True,className = 'ten columns')],className='row'),
-    html.Div([html.Label('Geolocation Selected',className = 'two columns'),dcc.Dropdown(id='filter_geo', multi=True,className = 'ten columns')],className='row'),
-    html.Div([html.Label('Traffic Source Selected',className = 'two columns'),dcc.Dropdown(id='filter_source', multi=True,className = 'ten columns')],className='row'),
+    html.Div([
+        #Over ALL Traffic
+        html.Div([ dcc.Graph(id = 'Overall Traffic')],className = 'twelve columns'),
+        html.Hr(),
+        html.Hr(),
+        html.Hr(),
+        html.Hr(),
+        html.Hr(),
+        html.Hr()
+        ],className = 'content-wrapper', style = {'margin':'132px 0 0 250px','padding': '10px 30px','overflow-y': 'scroll','left': '0','top': '0','height':'100vh','background-color': 'blue','z-index':'-1'})
 
-    #Filter Hidden Data\
-    html.Div(id='filters',style = {'display': 'none'}),
-    html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data'),
-    #Over ALL Traffic
-    html.Div([ dcc.Graph(id = 'Overall Traffic',className = 'twelve columns')],className='row')
     #First Pie
     # html.Div([ dcc.Graph(id = 'Overall Traffic',className = 'twelve columns')],className='row')
 
-])
+],className = 'wrapper', style = {'width': '100%', 'background-color':'black'})
 
 
 #Data Set
@@ -109,6 +120,7 @@ def read_data(date_start,date_end):
     global dfff
     dfff = pd.merge(df_main,pd.read_csv('Tables/articles+shared.csv',dtype={'article_id':str}),how='inner',on='article_id',indicator=True)
     dfff = dfff[(dfff['da_traffic'] >= date_start) & (dfff['da_traffic'] <= date_end)]
+    print 'dataframe changed'
     return 0
 
 
@@ -118,7 +130,7 @@ def read_data(date_start,date_end):
 @app.callback(
     dash.dependencies.Output(component_id='filter_domain', component_property='options'),
     [dash.dependencies.Input(component_id='meaww_filter', component_property='value'),
-     dash.dependencies.Input(component_id='data_frame', component_property='data-*')] )
+     dash.dependencies.Input(component_id='data_frame', component_property='data-*')])
 def filter_domain(meaww_filter,data_frame):
     global dfff
     domain = list(dfff['domain'].unique())
@@ -134,6 +146,7 @@ def filter_domain(meaww_filter,data_frame):
     [dash.dependencies.Input(component_id = 'filter_domain', component_property = 'options'),
      dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*')])
 def set_domain_value(filter_domain, data_frame):
+        print 'domain value set to ALL'
         return ['All']
 
 
@@ -152,8 +165,8 @@ def filter_category(meaww_filter, data_frame):
     else:
         return cc
 @app.callback(
-    dash.dependencies.Output('filter_category', 'value'),
-    [dash.dependencies.Input('filter_category', 'options'),
+    dash.dependencies.Output(component_id = 'filter_category', component_property = 'value'),
+    [dash.dependencies.Input(component_id = 'filter_category', component_property = 'options'),
      dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*')])
 def set_category_value(filter_category, data_frame):
         return ['All']
@@ -199,16 +212,17 @@ def set_source_value(filter_source, data_frame):
 
 #Combining Filters
 @app.callback(
-    dash.dependencies.Output(component_id='filters', component_property='data-*'),
-    [dash.dependencies.Input(component_id='filter_button', component_property='n_clicks')],
-    [dash.dependencies.State(component_id='filter_domain', component_property='value'),
-     dash.dependencies.State(component_id='filter_category', component_property='value'),
-     dash.dependencies.State(component_id='filter_geo', component_property='value'),
-     dash.dependencies.State(component_id='filter_source', component_property='value')])
+    dash.dependencies.Output(component_id = 'filters', component_property = 'data-*'),
+    [dash.dependencies.Input(component_id = 'filter_button', component_property = 'n_clicks'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*')],
+    [dash.dependencies.State(component_id = 'filter_domain', component_property = 'value'),
+     dash.dependencies.State(component_id = 'filter_category', component_property = 'value'),
+     dash.dependencies.State(component_id = 'filter_geo', component_property = 'value'),
+     dash.dependencies.State(component_id = 'filter_source', component_property = 'value')])
 
-def combine_filters(filter_button,filter_domain,filter_category,filter_geo,filter_source):
+def combine_filters(filter_button, data_frame, filter_domain, filter_category, filter_geo, filter_source):
     fil_ter = { 'domain':filter_domain, 'category':filter_category, 'geolocation':filter_geo, 'traffic_source':filter_source }
-    # print fil_ter
+    print 'combine filters called'
     return fil_ter
 
 
@@ -222,6 +236,7 @@ def combine_filters(filter_button,filter_domain,filter_category,filter_geo,filte
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Date Graph function called with below filters'
     print filters
     global dfff
     traffic = dfff
@@ -229,8 +244,10 @@ def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
         traffic = traffic[traffic['domain']!='meaww']
     if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
         for key,values in filters.iteritems():
-            if values != ['All'] and values != []:
+            if values != ['All'] and values != [] and values != None:
                 traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
     traffic = traffic.groupby('da_traffic').apply(aggregate_fun,'da_traffic').drop_duplicates()
     traffic = traffic.sort_values(by = 'da_traffic', ascending = True)
     traffic = traffic[(traffic['da_traffic'] >= str(date_start)) & (traffic['da_traffic'] <= str(date_end))]
