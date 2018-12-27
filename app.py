@@ -70,35 +70,37 @@ app.layout = html.Div([
                             )
                     ],className='four columns',style={'float':'right','width': '23.666667%'})
             ],className = 'row')
-        ],className = 'top-nav', style = {'position': 'fixed','top': '0','height': 'inherit', 'width': '100%', 'background-color': 'green','overflow':'hidden','zIndex': 9999999999}),
-
-    #Filter List
+        ],className = 'top-nav', style = {'position': 'fixed','top': '0','height': 'inherit', 'width': '100%', 'background-color': 'black','color':'white' ,'zIndex': 9999999999}),
+    #body
     html.Div([
-        html.Hr(),html.Label('Domain Selected'),dcc.Dropdown(id='filter_domain', multi=True),
-        html.Label('Category Selected'),dcc.Dropdown(id='filter_category', multi=True),
-        html.Label('Geolocation Selected'),dcc.Dropdown(id='filter_geo', multi=True),
-        html.Label('Traffic Source Selected'),dcc.Dropdown(id='filter_source', multi=True),
-        html.Br(),
-        html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data'),
-        #Filter Hidden Data
-        html.Div(id='filters',style = {'display': 'none'})
-        ],className = 'side-nav', style = {'padding': '0 5px','position': 'fixed', 'width': ' 250px','height':'100vh','left': '8px','right': '0px','overflow-y': 'scroll','background-color': 'red', 'top': '132px'}),
+        #Filter List
+        html.Div([
+            html.Hr(),html.Label('Domain Selected',style = {}),dcc.Dropdown(id='filter_domain', multi=True),
+            html.Label('Category Selected'),dcc.Dropdown(id='filter_category', multi=True),
+            html.Label('Geolocation Selected'),dcc.Dropdown(id='filter_geo', multi=True),
+            html.Label('Traffic Source Selected'),dcc.Dropdown(id='filter_source', multi=True),
+            html.Br(),
+            html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data'),
+            #Filter Hidden Data
+            html.Div(id='filters',style = {'display': 'none'})
+            ],className = 'three columns', style = {'padding': '0 5px','position': 'fixed', 'width': ' 250px','height':'100vh','left': '8px','right': '0px','overflow-y': 'scroll','background-color': '#411b09','color':'white','top':'146px'}),
 
-    html.Div([
-        #Over ALL Traffic
-        html.Div([ dcc.Graph(id = 'Overall Traffic')],className = 'twelve columns'),
-        html.Hr(),
-        html.Hr(),
-        html.Hr(),
-        html.Hr(),
-        html.Hr(),
-        html.Hr()
-        ],className = 'content-wrapper', style = {'margin':'132px 0 0 250px','padding': '10px 30px','overflow-y': 'scroll','left': '0','top': '0','height':'100vh','background-color': 'blue','z-index':'-1'})
+        html.Div([
+            #Over All Counts
+            html.Div(id = 'overall_count',className = 'row', style = {'text-align':'center','color':'white'}),
+            #Over ALL Traffic
+            html.Div([ dcc.Graph(id = 'Overall Traffic')],className = 'twelve columns'),
+            #Articles Shared
+            html.Div([ dcc.Graph(id = 'article_shared')],className = 'twelve columns')
+
+            ],className = 'nine columns',style = {'top': '138px', 'padding':'10px 30px', 'float': 'left', 'overflow-y': 'scroll','left': '240px',
+            'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'0.6', 'position': 'relative'})
+        ],className = 'row')
 
     #First Pie
     # html.Div([ dcc.Graph(id = 'Overall Traffic',className = 'twelve columns')],className='row')
 
-],className = 'wrapper', style = {'width': '100%', 'background-color':'black'})
+],className = 'row', style = {'width': '100%', 'background-color':'black'})
 
 
 #Data Set
@@ -225,6 +227,38 @@ def combine_filters(filter_button, data_frame, filter_domain, filter_category, f
     print 'combine filters called'
     return fil_ter
 
+#Count Overall
+@app.callback(
+    dash.dependencies.Output(component_id = 'overall_count', component_property = 'children'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def count_overall(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Count Overall Called'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    total_session = traffic['t_sessions'].sum()
+    total_articles_read = len(traffic['article_id'].unique())
+    total_articles_shared = len(list(traffic[(traffic['min'] >= date_start) & (traffic['min'] <= date_end)]['article_id'].unique()))
+    return [html.Div([html.H6('Sessions'),
+                  html.H2(total_session,style = {'background-color':'white','height':'100%', 'border-radius': '20%', 'color':'#1bd51b'})
+            ],className = 'four columns'),
+            html.Div([html.H6('Articles Read'),
+                  html.H2(total_articles_read,style = {'background-color':'white','height':'100%', 'border-radius': '20%', 'color':'#ab3a04'})
+            ],className = 'four columns'),
+            html.Div([html.H6('Articles Shared'),
+                  html.H2(total_articles_shared,style = {'background-color':'white','height':'100%', 'border-radius': '20%', 'color':'#ff91a4'})
+            ],className = 'four columns')]
 
 #Traffic Graph
 @app.callback(
@@ -259,7 +293,7 @@ def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
     #                 marker=dict(color='rgb(255,182,193)',line=dict(color='rgb(8,48,107)',width=1.5)),
                 opacity=0.6)
     data = [trace1,trace2,trace3,trace4]
-    layout = go.Layout(title='PubNinJa Traffic',
+    layout = go.Layout(title='PubNinJa Over All Traffic',
                        yaxis=dict(title='Articles Read'),
                        yaxis2=dict(title='Number of Sessions\Views\Users',
                        titlefont=dict(color='rgb(148, 103, 189)'),
@@ -268,6 +302,47 @@ def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
                        side='right')
                       )
     fig = {'data': data,'layout':layout}
+    return fig
+
+#Articles Shared Graph
+@app.callback(
+    dash.dependencies.Output(component_id = 'article_shared', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Article_Shared_Graph function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
+    traffic = traffic[(traffic['min'] >= date_start) & (traffic['min'] <= date_end)]
+    print "this is column list of articles graph traffic"
+    print list(traffic)
+    traffic = traffic[['domain','category','min','article_id']].drop_duplicates().groupby(['domain','category','min']).count().reset_index()
+    traffic.columns = ['domain','category','Date','Articles Shared']
+    traffic = traffic.sort_values(by = 'Date', ascending = True)
+    final = []
+    ffff = pd.pivot_table(traffic,index="Date",columns="category", values='Articles Shared').reset_index()
+    ffff = ffff.sort_values(by='Date',ascending = True)
+    value_li = list(ffff)
+    for i in value_li[1:]:
+        temp = go.Bar( x=ffff['Date'], y=ffff[i], name=i, opacity=0.6)
+        final.append(temp)
+    layout = go.Layout(title='PubNinJa Articles Shared',
+                       yaxis=dict(title='Number of Articles Shared'),
+                       barmode='stack')
+    fig = {'data': final,'layout':layout}
     return fig
 
 
