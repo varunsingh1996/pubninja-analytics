@@ -75,12 +75,13 @@ app.layout = html.Div([
     html.Div([
         #Filter List
         html.Div([
-            html.Hr(),html.Label('Domain Selected',style = {}),dcc.Dropdown(id='filter_domain', multi=True),
-            html.Label('Category Selected'),dcc.Dropdown(id='filter_category', multi=True),
-            html.Label('Geolocation Selected'),dcc.Dropdown(id='filter_geo', multi=True),
-            html.Label('Traffic Source Selected'),dcc.Dropdown(id='filter_source', multi=True),
+            html.H4('Filters'),
+            html.Hr(),html.Label('Domain Selected',style = {}),dcc.Dropdown(id='filter_domain', multi=True,style={'color':'black'}),
+            html.Label('Category Selected'),dcc.Dropdown(id='filter_category', multi=True, style={'color':'black'}),
+            html.Label('Geolocation Selected'),dcc.Dropdown(id='filter_geo', multi=True, style={'color':'black'}),
+            html.Label('Traffic Source Selected'),dcc.Dropdown(id='filter_source', multi=True, style={'color':'black'}),
             html.Br(),
-            html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data'),
+            html.Button(id='filter_button',n_clicks = 0, children = 'Filter Data', style = {'background-color':'white'}),
             #Filter Hidden Data
             html.Div(id='filters',style = {'display': 'none'})
             ],className = 'three columns', style = {'padding': '0 5px','position': 'fixed', 'width': ' 250px','height':'100vh','left': '8px','right': '0px','overflow-y': 'scroll','background-color': '#411b09','color':'white','top':'146px'}),
@@ -88,19 +89,22 @@ app.layout = html.Div([
         html.Div([
             #Over All Counts
             html.Div(id = 'overall_count',className = 'row', style = {'text-align':'center','color':'white'}),
+            html.Br(),
             #Over ALL Traffic
-            html.Div([ dcc.Graph(id = 'Overall Traffic')],className = 'twelve columns'),
+            html.Div([ dcc.Graph(id = 'Overall Traffic')],className = 'twelve columns', style = {'margin-top': '40px'}),
             #Articles Shared
-            html.Div([ dcc.Graph(id = 'article_shared')],className = 'twelve columns')
+            html.Div([ dcc.Graph(id = 'article_shared')],className = 'twelve columns', style = {'margin-top': '40px'}),
+            #Domain Traffic
+            html.Div([ dcc.Graph(id = 'domain_traffic')],className = 'twelve columns', style = {'margin-top': '40px'})
 
             ],className = 'nine columns',style = {'top': '138px', 'padding':'10px 30px', 'float': 'left', 'overflow-y': 'scroll','left': '240px',
-            'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'0.6', 'position': 'relative'})
+            'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'1', 'position': 'relative'})
         ],className = 'row')
 
     #First Pie
     # html.Div([ dcc.Graph(id = 'Overall Traffic',className = 'twelve columns')],className='row')
 
-],className = 'row', style = {'width': '100%', 'background-color':'black'})
+],className = 'row', style = {'width': '100%'})
 
 
 #Data Set
@@ -343,6 +347,66 @@ def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters
                        yaxis=dict(title='Number of Articles Shared'),
                        barmode='stack')
     fig = {'data': final,'layout':layout}
+    return fig
+
+
+#Domain Traffic
+@app.callback(
+    dash.dependencies.Output(component_id = 'domain_traffic', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Domain_Traffic_Graph function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
+    shared_articles = traffic[(traffic['min'] >= date_start) & (traffic['min'] <= date_end)]
+    shared_articles = shared_articles[['domain','min']].drop_duplicates().groupby(['domain']).count().reset_index()
+    traffic = traffic.groupby('domain').apply(aggregate_fun,'domain').drop_duplicates()
+    traffic = traffic[['domain','Total Sessions','Total Users','Total Articles Read']]
+    traffic = pd.merge(traffic, shared_articles, on = 'domain', how = 'left')
+    traffic.columns = ['domain','Sessions','Users','Articles Read','Articles Shared']
+    print "this is column list of Domain_Traffic_Graph traffic"
+    print list(traffic)
+    data = []
+    annotations = []
+    label_data = ['Sessions','Users','Articles Read','Articles Shared']
+    graph_data = [[{'x': [0.00, 0.21],'y': [0, 1]},[ 0.05,0]],
+                 [{'x': [0.24, 0.45],'y': [0, 1]},[0.30,0]],
+                 [{'x': [0.49, 0.71],'y': [0, 1]},[0.69,0]],
+                 [{'x': [0.75, 0.96],'y': [0, 1]},[0.94,0]]]
+    for i in range(0,len(label_data)):
+        temp_dict = {
+              "labels": list(traffic['domain']),
+              "values": list(traffic[label_data[i]]),
+              "domain": graph_data[i][0],
+              "name": label_data[i],
+              "hoverinfo":"label+percent+name",
+              "textinfo":"none",
+              "hole": .4,
+              "type": "pie"
+            }
+        temp_annotation = {"font": {"size": 15},"showarrow": False,"text": label_data[i],"x":graph_data[i][1][0],"y":graph_data[i][1][1]}
+        data.append(temp_dict)
+        annotations.append(temp_annotation)
+    layout = {
+            "title":"Domain Traffic",
+            "annotations": annotations
+        }
+    fig = { 'data':data,'layout':layout}
+    print fig
     return fig
 
 
