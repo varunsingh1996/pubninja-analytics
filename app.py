@@ -95,7 +95,16 @@ app.layout = html.Div([
             #Articles Shared
             html.Div([ dcc.Graph(id = 'article_shared')],className = 'twelve columns', style = {'margin-top': '40px'}),
             #Domain Traffic
-            html.Div([ dcc.Graph(id = 'domain_traffic')],className = 'twelve columns', style = {'margin-top': '40px'})
+            html.Div([ dcc.Graph(id = 'domain_traffic')],className = 'twelve columns', style = {'margin-top': '40px'}),
+            #Category Traffic
+            html.Div([dcc.Graph(id = 'category_traffic')],className = 'twelve columns',style={'margin-top': '40px'}),
+            #Category and Geolocation Traffic
+            html.Div([
+                #Category
+                html.Div([dcc.Graph(id = 'geo_traffic')],className = 'six columns',style={'float': 'left'}),
+                #Geolocation
+                html.Div([dcc.Graph(id = 'source_traffic')],className = 'six columns',style={'float': 'right'})
+            ],className = 'twelve columns',style = {'margin-top': '40px'})
 
             ],className = 'nine columns',style = {'top': '138px', 'padding':'10px 30px', 'float': 'left', 'overflow-y': 'scroll','left': '240px',
             'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'1', 'position': 'relative'})
@@ -335,7 +344,6 @@ def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters
     print list(traffic)
     traffic = traffic[['domain','category','min','article_id']].drop_duplicates().groupby(['domain','category','min']).count().reset_index()
     traffic.columns = ['domain','category','Date','Articles Shared']
-    traffic = traffic.sort_values(by = 'Date', ascending = True)
     final = []
     ffff = pd.pivot_table(traffic,index="Date",columns="category", values='Articles Shared').reset_index()
     ffff = ffff.sort_values(by='Date',ascending = True)
@@ -393,7 +401,7 @@ def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
               "values": list(traffic[label_data[i]]),
               "domain": graph_data[i][0],
               "name": label_data[i],
-              "hoverinfo":"label+percent+name",
+              "hoverinfo":"label+percent+name+value",
               "textinfo":"none",
               "hole": .4,
               "type": "pie"
@@ -406,8 +414,133 @@ def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
             "annotations": annotations
         }
     fig = { 'data':data,'layout':layout}
-    print fig
+    # print fig
     return fig
+
+
+#Category Traffic
+@app.callback(
+    dash.dependencies.Output(component_id = 'category_traffic', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Category_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Categiry_Traffic_Graph function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
+    shared_articles = traffic[(traffic['min'] >= date_start) & (traffic['min'] <= date_end)]
+    shared_articles = shared_articles[['category','min']].drop_duplicates().groupby(['category']).count().reset_index()
+    traffic = traffic.groupby('category').apply(aggregate_fun,'category').drop_duplicates()
+    traffic = traffic[['category','Total Sessions','Total Users','Total Articles Read']]
+    traffic = pd.merge(traffic, shared_articles, on = 'category', how = 'left')
+    traffic.columns = ['category','Sessions','Users','Articles Read','Articles Shared']
+    data = []
+    location = [{'x': [0, .48],'y': [0, .49]},
+                {'x': [.52, 1],'y': [0, .49]},
+                {'x': [0, .48],'y': [.51, 1]},
+                {'x': [.52, 1],'y': [.51, 1]}]
+    label_data = ['domain','Sessions','Users','Articles Read','Articles Shared']
+    for i in range(0,4):
+        temp_data = {
+                'labels':list(traffic['category']),
+                'values':list(traffic[label_data[i+1]]) ,
+                'type': 'pie',
+                'name': label_data[i+1],
+                'domain': location[i],
+                'hoverinfo':'label+percent+name+value',
+                'textinfo':'none'
+            }
+        data.append(temp_data)
+    fig = {'data':data,
+        'layout': {'title': 'Category Traffic', 'showlegend' : True, 'legend' : dict(orientation="h")}}
+    return fig
+
+
+#Geo Traffic
+@app.callback(
+    dash.dependencies.Output(component_id = 'geo_traffic', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Geo_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Geo_Traffic_Graph function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
+    traffic = dfff
+    traffic = traffic[['geolocation','t_sessions']].drop_duplicates().groupby(['geolocation']).sum().reset_index()
+    return {"data": [{
+                "values": list(traffic['t_sessions']),
+                "labels": list(traffic['geolocation']),
+                'domain': {'x': [0, 1],'y': [0, 1]},
+                "name": "Traffic Geolocation",
+                "hoverinfo":"label+percent+name+value",
+                "textinfo":"none",
+                "hole": .5,
+                "type": "pie"
+                }],
+            "layout": {"title":"Traffic Geolocation", "legend":dict(orientation="h"), "annotations":[{"font": {"size": 10},"showarrow": False,"text": 'Traffic Geolocation',"x": 0.5,"y":0.5 }]}}
+
+#source Traffic
+@app.callback(
+    dash.dependencies.Output(component_id = 'source_traffic', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Source_Traffic_Graph function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    global temp_df
+    temp_df = traffic
+    traffic = dfff
+    traffic = traffic[['traffic_source','t_sessions']].drop_duplicates().groupby(['traffic_source']).sum().reset_index()
+    return {"data": [{
+                "values": list(traffic['t_sessions']),
+                "labels": list(traffic['traffic_source']),
+                'domain': {'x': [0, 1],'y': [0, 1]},
+                "name": "Traffic Source",
+                "hoverinfo":"label+percent+name+value",
+                "textinfo":"none",
+                "hole": .5,
+                "type": "pie"
+                }],
+            "layout": {"title":"Traffic Source",
+                    #    "legend":dict(orientation="h"),
+                       "annotations":[{"font": {"size": 10},"showarrow": False,"text": 'Traffic Source',"x": 0.5,"y":0.5 }]}}
 
 
 
