@@ -13,7 +13,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
-# global articles_df
+global articles_df
 global dfff,temp_df
 
 
@@ -98,13 +98,15 @@ app.layout = html.Div([
             html.Div([ dcc.Graph(id = 'domain_traffic')],className = 'twelve columns', style = {'margin-top': '40px'}),
             #Category Traffic
             html.Div([dcc.Graph(id = 'category_traffic')],className = 'twelve columns',style={'margin-top': '40px'}),
-            #Category and Geolocation Traffic
+            #Source and Geolocation Traffic
             html.Div([
-                #Category
-                html.Div([dcc.Graph(id = 'geo_traffic')],className = 'six columns',style={'float': 'left'}),
                 #Geolocation
+                html.Div([dcc.Graph(id = 'geo_traffic')],className = 'six columns',style={'float': 'left'}),
+                #Source
                 html.Div([dcc.Graph(id = 'source_traffic')],className = 'six columns',style={'float': 'right'})
-            ],className = 'twelve columns',style = {'margin-top': '40px'})
+            ],className = 'twelve columns',style = {'margin-top': '40px'}),
+            #Articles Updates
+            html.Div([dcc.Graph(id = 'articles_update')],className = 'twelve columns',style={'margin-top': '40px'})
 
             ],className = 'nine columns',style = {'top': '138px', 'padding':'10px 30px', 'float': 'left', 'overflow-y': 'scroll','left': '240px',
             'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'1', 'position': 'relative'})
@@ -132,6 +134,8 @@ def read_data(date_start,date_end):
     else:
         df_main = pd.read_csv('Tables/Normalise Dump/'+date_end[5:7]+'.csv',dtype={'article_id':str})
     #initalizing dataframe.
+    global articles_df
+    articles_df = pd.read_csv('Tables/articles+shared.csv')
     global dfff
     dfff = pd.merge(df_main,pd.read_csv('Tables/articles+shared.csv',dtype={'article_id':str}),how='inner',on='article_id',indicator=True)
     dfff = dfff[(dfff['da_traffic'] >= date_start) & (dfff['da_traffic'] <= date_end)]
@@ -543,6 +547,47 @@ def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
                        "annotations":[{"font": {"size": 10},"showarrow": False,"text": 'Traffic Source',"x": 0.5,"y":0.5 }]}}
 
 
+
+#source Traffic
+@app.callback(
+    dash.dependencies.Output(component_id = 'articles_update', component_property = 'figure'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
+
+def Articles_Update(date_start, date_end, meaww_filter, data_frame, filters):
+    print 'Source_Traffic_Graph function called with below filters'
+    print filters
+    global articles_df
+    traffic = articles_df
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None and key != 'traffic_source':
+                traffic = traffic[traffic[key].isin(values)]
+    def artice_status_fun(so,traffic):
+        temp_df = articles_df[(articles_df[so] >= date_start) & (articles_df[so] <= date_end)]
+        temp_df = temp_df[[so,'article_id']].drop_duplicates()
+        temp_df[so] = pd.to_datetime(temp_df[so], format='%Y/%m/%d')
+        temp_df[so] = temp_df[so].dt.date
+        temp_df = temp_df.groupby(so).count().reset_index()
+        temp_df.columns = ['Date',so]
+        return temp_df
+    dfs = [artice_status_fun('dateadded',traffic),artice_status_fun('approval_date',traffic),artice_status_fun('live_date',traffic),artice_status_fun('min',traffic)]
+    traffic = reduce(lambda left,right: pd.merge(left,right,on='Date',how='outer'), dfs)
+    traffic.columns = ['Date','Added','Approved','Live','Shared']
+    trace1 = go.Scatter(x=traffic['Date'], y=traffic['Added'],name='Added')
+    trace2 = go.Scatter(x=traffic['Date'], y=traffic['Approved'],name='Approved')
+    trace3 = go.Scatter(x=traffic['Date'], y=traffic['Live'],name='Live')
+    trace4 = go.Scatter(x=traffic['Date'], y=traffic['Shared'],name='Shared')
+    data = [trace1,trace2,trace3,trace4]
+    layout = go.Layout(title='Article Update',
+                       yaxis=dict(title='Number of Articles'))
+    fig = {'data': data,'layout':layout}
+    return fig
 
 
 if __name__ == '__main__':
