@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 import ipywidgets as widgets
+import dash_table
 import plotly.plotly as py
 import plotly
 from datetime import datetime as dt
+from datetime import timedelta
 import plotly.graph_objs as go
 from IPython.display import display
 plotly.tools.set_credentials_file(username='varunpratap', api_key='FTfaaNI30HlESU7X8HIb')
@@ -17,17 +19,25 @@ global articles_df
 global dfff,temp_df
 
 
-def aggregate_fun(df,agg):
+def aggregate_fun(df,arg):
     df['Total Articles Read'] = len(df['article_id'].unique())
     df['Total Sessions'] = df['t_sessions'].sum()
     df['Total Users'] = df['t_users'].sum()
     df['Total Views'] = df['t_visits'].sum()
-    return df[[agg,'Total Sessions','Total Articles Read','Total Users','Total Views']]
+    col = ['Total Sessions','Total Articles Read','Total Users','Total Views']
+    if type(arg) == list:
+        for i in arg:
+            col.append(i)
+        print col
+        return df[col]
+    else:
+        return df[[arg,'Total Sessions','Total Articles Read','Total Users','Total Views']]
 
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css','https://codepen.io/chriddyp/pen/brPBPO.css','https://raw.githubusercontent.com/varunsingh1996/pubninja-analytics/master/dashboard_style.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app.config['suppress_callback_exceptions'] = True
 dfff = pd.DataFrame()
 
 
@@ -104,9 +114,35 @@ app.layout = html.Div([
                 html.Div([dcc.Graph(id = 'geo_traffic')],className = 'six columns',style={'float': 'left'}),
                 #Source
                 html.Div([dcc.Graph(id = 'source_traffic')],className = 'six columns',style={'float': 'right'})
-            ],className = 'twelve columns',style = {'margin-top': '40px'}),
+                ],className = 'twelve columns',style = {'margin-top': '40px'}),
             #Articles Updates
-            html.Div([dcc.Graph(id = 'articles_update')],className = 'twelve columns',style={'margin-top': '40px'})
+            html.Div([dcc.Graph(id = 'articles_update')],className = 'twelve columns',style={'margin-top': '40px'}),
+            # comparision
+            html.Div([
+                html.Div([
+                    html.H4('Comparision Metrics',style = {'color':'white'}),
+                    dcc.Dropdown(
+                        id='comparision_period',
+                        options=[
+                            {'label': 'Day', 'value': 'Day'},
+                            {'label': 'Week', 'value': 'Week'},
+                            {'label': 'Month', 'value': 'Month'},
+                            {'label': 'Specify', 'value': 'Specify'}
+                        ],
+                        value='Day'),
+                        # style = {'display':'inline'}),
+                    dcc.Dropdown(
+                        id='comparision_column',
+                        options=[
+                            {'label': 'Category', 'value': 'category'},
+                            {'label': 'Domain', 'value': 'domain'}
+                        ],
+                        value='domain')
+                        # style = {'display':'inline'})
+                    ],className='twelve columns'),
+                # html.Div(id='date_range'),
+                html.Div(id='comparsion_output',className = 'twelve columns')
+                ],className='twelve columns', style = {'margin-top': '40px'})
 
             ],className = 'nine columns',style = {'top': '138px', 'padding':'10px 30px', 'float': 'left', 'overflow-y': 'scroll','left': '240px',
             'height':'100vh','background-color': '#411b09','z-index':'-1','opacity':'1', 'position': 'relative'})
@@ -165,7 +201,7 @@ def filter_domain(meaww_filter,data_frame):
     [dash.dependencies.Input(component_id = 'filter_domain', component_property = 'options'),
      dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*')])
 def set_domain_value(filter_domain, data_frame):
-        print 'domain value set to ALL'
+        # print 'domain value set to ALL'
         return ['All']
 
 
@@ -241,7 +277,7 @@ def set_source_value(filter_source, data_frame):
 
 def combine_filters(filter_button, data_frame, filter_domain, filter_category, filter_geo, filter_source):
     fil_ter = { 'domain':filter_domain, 'category':filter_category, 'geolocation':filter_geo, 'traffic_source':filter_source }
-    print 'combine filters called'
+    # print 'combine filters called'
     return fil_ter
 
 #Count Overall
@@ -254,8 +290,8 @@ def combine_filters(filter_button, data_frame, filter_domain, filter_category, f
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def count_overall(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Count Overall Called'
-    print filters
+    # print 'Count Overall Called'
+    # print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -287,8 +323,8 @@ def count_overall(date_start, date_end, meaww_filter, data_frame, filters):
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Date Graph function called with below filters'
-    print filters
+    # print 'Date Graph function called with below filters'
+    # print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -299,9 +335,9 @@ def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
                 traffic = traffic[traffic[key].isin(values)]
     global temp_df
     temp_df = traffic
+    traffic = traffic[(traffic['da_traffic'] >= str(date_start)) & (traffic['da_traffic'] <= str(date_end))]
     traffic = traffic.groupby('da_traffic').apply(aggregate_fun,'da_traffic').drop_duplicates()
     traffic = traffic.sort_values(by = 'da_traffic', ascending = True)
-    traffic = traffic[(traffic['da_traffic'] >= str(date_start)) & (traffic['da_traffic'] <= str(date_end))]
     trace1 = go.Scatter(x=traffic['da_traffic'], y=traffic['Total Sessions'],name='Total Sessions',yaxis='y2')
     trace2 = go.Scatter(x=traffic['da_traffic'], y=traffic['Total Users'],name='Total Users',yaxis='y2')
     trace3 = go.Scatter(x=traffic['da_traffic'], y=traffic['Total Views'],name='Total Views',yaxis='y2')
@@ -331,8 +367,6 @@ def Date_Graph(date_start, date_end, meaww_filter, data_frame, filters):
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Article_Shared_Graph function called with below filters'
-    print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -344,8 +378,6 @@ def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters
     global temp_df
     temp_df = traffic
     traffic = traffic[(traffic['min'] >= date_start) & (traffic['min'] <= date_end)]
-    print "this is column list of articles graph traffic"
-    print list(traffic)
     traffic = traffic[['domain','category','min','article_id']].drop_duplicates().groupby(['domain','category','min']).count().reset_index()
     traffic.columns = ['domain','category','Date','Articles Shared']
     final = []
@@ -372,8 +404,6 @@ def Article_Shared_Graph(date_start, date_end, meaww_filter, data_frame, filters
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Domain_Traffic_Graph function called with below filters'
-    print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -390,8 +420,6 @@ def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
     traffic = traffic[['domain','Total Sessions','Total Users','Total Articles Read']]
     traffic = pd.merge(traffic, shared_articles, on = 'domain', how = 'left')
     traffic.columns = ['domain','Sessions','Users','Articles Read','Articles Shared']
-    print "this is column list of Domain_Traffic_Graph traffic"
-    print list(traffic)
     data = []
     annotations = []
     label_data = ['Sessions','Users','Articles Read','Articles Shared']
@@ -418,7 +446,6 @@ def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
             "annotations": annotations
         }
     fig = { 'data':data,'layout':layout}
-    # print fig
     return fig
 
 
@@ -432,8 +459,6 @@ def Domain_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Category_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Categiry_Traffic_Graph function called with below filters'
-    print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -482,8 +507,6 @@ def Category_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filte
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Geo_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Geo_Traffic_Graph function called with below filters'
-    print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -492,9 +515,6 @@ def Geo_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
         for key,values in filters.iteritems():
             if values != ['All'] and values != [] and values != None:
                 traffic = traffic[traffic[key].isin(values)]
-    global temp_df
-    temp_df = traffic
-    traffic = dfff
     traffic = traffic[['geolocation','t_sessions']].drop_duplicates().groupby(['geolocation']).sum().reset_index()
     return {"data": [{
                 "values": list(traffic['t_sessions']),
@@ -518,8 +538,6 @@ def Geo_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Source_Traffic_Graph function called with below filters'
-    print filters
     global dfff
     traffic = dfff
     if meaww_filter == 'meaww':
@@ -528,9 +546,6 @@ def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
         for key,values in filters.iteritems():
             if values != ['All'] and values != [] and values != None:
                 traffic = traffic[traffic[key].isin(values)]
-    global temp_df
-    temp_df = traffic
-    traffic = dfff
     traffic = traffic[['traffic_source','t_sessions']].drop_duplicates().groupby(['traffic_source']).sum().reset_index()
     return {"data": [{
                 "values": list(traffic['t_sessions']),
@@ -548,7 +563,7 @@ def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
 
 
 
-#source Traffic
+#Articles Status
 @app.callback(
     dash.dependencies.Output(component_id = 'articles_update', component_property = 'figure'),
     [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
@@ -558,18 +573,16 @@ def Source_Traffic_Graph(date_start, date_end, meaww_filter, data_frame, filters
      dash.dependencies.Input(component_id = 'filters', component_property = 'data-*')])
 
 def Articles_Update(date_start, date_end, meaww_filter, data_frame, filters):
-    print 'Source_Traffic_Graph function called with below filters'
-    print filters
     global articles_df
     traffic = articles_df
     if meaww_filter == 'meaww':
         traffic = traffic[traffic['domain']!='meaww']
     if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
         for key,values in filters.iteritems():
-            if values != ['All'] and values != [] and values != None and key != 'traffic_source':
+            if values != ['All'] and values != [] and values != None and key != 'traffic_source' and key != 'geolocation':
                 traffic = traffic[traffic[key].isin(values)]
     def artice_status_fun(so,traffic):
-        temp_df = articles_df[(articles_df[so] >= date_start) & (articles_df[so] <= date_end)]
+        temp_df = traffic[(traffic[so] >= date_start) & (traffic[so] <= date_end)]
         temp_df = temp_df[[so,'article_id']].drop_duplicates()
         temp_df[so] = pd.to_datetime(temp_df[so], format='%Y/%m/%d')
         temp_df[so] = temp_df[so].dt.date
@@ -584,10 +597,175 @@ def Articles_Update(date_start, date_end, meaww_filter, data_frame, filters):
     trace3 = go.Scatter(x=traffic['Date'], y=traffic['Live'],name='Live')
     trace4 = go.Scatter(x=traffic['Date'], y=traffic['Shared'],name='Shared')
     data = [trace1,trace2,trace3,trace4]
-    layout = go.Layout(title='Article Update',
+    layout = go.Layout(title='Article\'s Status',
                        yaxis=dict(title='Number of Articles'))
     fig = {'data': data,'layout':layout}
     return fig
+
+#coparision Date
+# @app.callback(
+#     dash.dependencies.Output(component_id = 'date_range', component_property = 'children'),
+#     [dash.dependencies.Input(component_id = 'comparision_period', component_property = 'value'),
+#      dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+#      dash.dependencies.Input(component_id = 'date_end', component_property = 'date')])
+
+# def Date_range_fig(comparision_period,date_start,date_end):
+#     if comparision_period == 'Specify':
+#         print 'in specify comparision Date'
+#         return (html.Label('Select Date Range x'),
+#             dcc.DatePickerSingle(
+#                 id='data1_start_date',
+#                 date=dt(2018, 11, 01),
+#                 min_date_allowed=date_start,
+#                 max_date_allowed=date_end),
+#             dcc.DatePickerSingle(
+#                 id='data1_start_end',
+#                 date=dt(2018, 12, 11),
+#                 min_date_allowed=date_start,
+#                 max_date_allowed=date_end),
+#             html.Label('Select Date Range y'),
+#             dcc.DatePickerSingle(
+#                 id='data2_start_date',
+#                 date=dt(2018, 11, 01),
+#                 min_date_allowed=date_start,
+#                 max_date_allowed=date_end),
+#             dcc.DatePickerSingle(
+#                 id='data2_start_date',
+#                 date=dt(2018, 12, 11),
+#                 min_date_allowed=date_start,
+#                 max_date_allowed=date_end)
+#             )
+#     else:
+#         return html.Div(style = {'display': 'none'})
+
+def compare_data_fun(data,comparision_column):
+    a = data.groupby(['da_traffic',comparision_column]).count().reset_index()[['da_traffic',comparision_column,'article_id','min']]
+    b = data.groupby(['da_traffic',comparision_column]).sum().reset_index()[['da_traffic',comparision_column,'t_visits','t_sessions','t_users']]
+    return pd.merge(a,b,how='outer',on=['da_traffic',comparision_column])
+
+# Comparision
+@app.callback(
+    dash.dependencies.Output(component_id = 'comparsion_output', component_property = 'children'),
+    [dash.dependencies.Input(component_id = 'date_start', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'date_end', component_property = 'date'),
+     dash.dependencies.Input(component_id = 'meaww_filter', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'data_frame', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'filters', component_property = 'data-*'),
+     dash.dependencies.Input(component_id = 'comparision_column', component_property = 'value'),
+     dash.dependencies.Input(component_id = 'comparision_period', component_property = 'value')])
+    #  dash.dependencies.Input(component_id = 'data1_start_date', component_property = 'date'),
+    #  dash.dependencies.Input(component_id = 'data1_end_date', component_property = 'date'),
+    #  dash.dependencies.Input(component_id = 'data2_start_date', component_property = 'date'),
+    #  dash.dependencies.Input(component_id = 'data2_end_date', component_property = 'date')])
+
+def Comaprision_Traffic(date_start, date_end, meaww_filter, data_frame, filters,comparision_column,comparision_period):
+# data2_start_date,data1_start_date,data1_end_date,data2_end_date):
+    print 'Comaprision_Traffic function called with below filters'
+    print filters
+    global dfff
+    traffic = dfff
+    if meaww_filter == 'meaww':
+        traffic = traffic[traffic['domain']!='meaww']
+    if filters != {u'category': None, u'geolocation': None, u'domain': None, u'traffic_source': None}:
+        for key,values in filters.iteritems():
+            if values != ['All'] and values != [] and values != None:
+                traffic = traffic[traffic[key].isin(values)]
+    traffic = traffic[(traffic['da_traffic'] >= str(date_start)) & (traffic['da_traffic'] <= str(date_end))]
+    df = traffic[[comparision_column,'da_traffic','article_id','t_visits','t_sessions','t_users','min']]
+    # # if comparision_period == 'Specify':
+    # #     data1  = df[(df['da_traffic'] >= str(data1_start_date)) & (df['da_traffic'] <= str(data1_end_date))]
+    # #     data2  = df[(df['da_traffic'] >= str(data2_start_date)) & (df['da_traffic'] <= str(data2_end_date))]
+    # # el
+    date_end = dt.strptime(date_end, '%Y-%m-%d').date()
+    date_start = dt.strptime(date_start, '%Y-%m-%d').date()
+    if comparision_period == 'Day':
+        if (date_end - date_start).days > 1:
+            y = html.Label("Y = "+str(date_end))
+            x = html.Label("X = "+str(date_end - timedelta(days=1)))
+            data1  = df[(df['da_traffic'] >= str(date_end - timedelta(days=1))) & (df['da_traffic'] < str(date_end))]
+            data2  = df[df['da_traffic'] == str(date_end)]
+        else:
+            return html.Label('**Please Select Atleast 2 Days Date Range For Months Comparision**',style = {'background-color': 'white','color': 'red'})
+    elif comparision_period == 'Month':
+        if (date_end - date_start).days > 59:
+            y = html.Label("Y = "+str(date_end)+' to '+str(date_end - timedelta(days=30)))
+            x = html.Label("X = "+str(date_end - timedelta(days=31))+' to '+str(str(date_end - timedelta(days=60))))
+            date_end = date_end - timedelta(days=30)
+            data1  = df[(df['da_traffic'] >= str(date_end - timedelta(days=30))) & (df['da_traffic'] < str(date_end))]
+            data2  = df[df['da_traffic'] >= str(date_end)]
+        else:
+            return html.Label('**Please Select Atleast 60 Days Date Range For Months Comparision**',style = {'background-color': 'white','color': 'red'})
+    else:
+        if (date_end - date_start).days > 13:
+            y = html.Label("Y = "+str(date_end)+' to '+str(date_end - timedelta(days=7)))
+            x = html.Label("X = "+str(date_end - timedelta(days=8))+' to '+str(str(date_end - timedelta(days=14))))
+            date_end = date_end - timedelta(days=7)
+            data1  = df[(df['da_traffic'] >= str(date_end - timedelta(days=7))) & (df['da_traffic'] < str(date_end))]
+            data2  = df[df['da_traffic'] >= str(date_end)]
+        else:
+            return html.Label('**Please Select Atleast 14 Days Date Range For Weeks Comparision**',style = {'background-color': 'white','color': 'red'})
+    traffic1 = compare_data_fun(data1,comparision_column)
+    traffic2 = compare_data_fun(data2,comparision_column)
+    traffic1 = traffic1.groupby(comparision_column).sum().reset_index()
+    traffic2 = traffic2.groupby(comparision_column).sum().reset_index()
+    gou = pd.merge(traffic1,traffic2, on=comparision_column, how='outer')
+    col = ['t_sessions','article_id','t_users','t_visits','min']
+    for i in col:
+        gou[i] = (gou[i+'_y']/gou[i+'_x'])*100
+        gou[i] = gou[i].apply(lambda s: s-100).round(2)
+    # gou = gou[[comparision_column, 't_sessions_x','t_sessions_y','t_sessions', 'article_id_x','article_id_y','article_id','t_users_x','t_users_y','t_users','t_visits_x','t_visits_y','t_visits','min_x','min_y','min']]
+    gou = gou[[comparision_column, 't_sessions_x','t_sessions_y','t_sessions','min_x','min_y','min']]
+    # gou.columns = [comparision_column, 'Total Sessions_x','Total Sessions_y','Total Sessions_diff', 'Total Articles Read_x','Total Articles Read_y','Total Articles Read_diff','Total Users_x','Total Users_y','Total Users_diff','Total Views_x','Total Views_y','Total Views_diff','Articles Shared_x','Articles Shared_y','Articles Shared_diff']
+    gou.columns = [comparision_column, 'Total Sessions_x','Total Sessions_y','Sessions_diff','Articles Shared_x','Articles Shared_y','Shared_diff']
+    return [html.Br(),
+            html.Div([x,y],style={'background-color':'white'}),
+            html.Br(),
+            dash_table.DataTable(
+                data = gou.to_dict('rows'),
+                # columns=[{'id': c, 'name': c} for c in gou.columns],
+                columns = [{"name": ["", comparision_column.upper()], "id": comparision_column},
+                            {"name": ["Total Sessions", "X"], "id": "Total Sessions_x"},
+                            {"name": ["Total Sessions", "Y"], "id": "Total Sessions_y"},
+                            {"name": ["Total Sessions", "Diff"], "id": "Sessions_diff"},
+                            {"name": ["Articles Shared", "X"], "id": "Articles Shared_x"},
+                            {"name": ["Articles Shared", "Y"], "id": "Articles Shared_y"},
+                            {"name": ["Articles Shared", "Diff"], "id": "Shared_diff"}],
+                merge_duplicate_headers = True,
+                sorting = True,
+                style_cell={'padding': '5px',
+                            'backgroundColor': 'rgb(50, 50, 50)',
+                            'color': 'white'},
+                style_header = {
+                        'backgroundColor': 'black',
+                        'fontWeight': 'bold',
+                        'color':'white'},
+                style_table = {
+                    'maxHeight': '300',
+                    'overflowY': 'scroll',
+                    'border': 'thin lightgrey solid'},
+                style_data_conditional = [
+                    {
+                        'if': {
+                            'column_id': 'Sessions_diff',
+                            'filter': 'Sessions_diff < num(0)'
+                        },
+                        'backgroundColor': 'red',
+                        'color': 'black',
+                    },
+                    {
+                        'if': {
+                            'column_id': 'Shared_diff',
+                            'filter': 'Shared_diff < num(0)'
+                        },
+                        'backgroundColor': 'red',
+                        'color': 'black',
+                    }
+                ],
+                style_cell_conditional = [{
+                            'if': {'column_id':comparision_column},
+                            'textAlign': 'left'
+                        }]
+            )]
 
 
 if __name__ == '__main__':
